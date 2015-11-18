@@ -1,26 +1,21 @@
 package amazoncf
 
 import (
-
+	"crypto/md5"
+	"crypto/rand"
 	"fmt"
-		"crypto/rand"
-"crypto/md5"
-"io"
+	"io"
 
 	"github.com/docker/machine/libmachine/drivers"
+	"github.com/docker/machine/libmachine/log"
 	"github.com/docker/machine/libmachine/mcnflag"
 	"github.com/docker/machine/libmachine/mcnutils"
-		"github.com/docker/machine/libmachine/log"
-			"github.com/docker/machine/libmachine/state"
+	"github.com/docker/machine/libmachine/state"
 
-
-
-
-	 "github.com/aws/aws-sdk-go/aws"
-    "github.com/aws/aws-sdk-go/aws/session"
-    "github.com/aws/aws-sdk-go/service/cloudformation"
-    "github.com/aws/aws-sdk-go/service/ec2"
-
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/cloudformation"
+	"github.com/aws/aws-sdk-go/service/ec2"
 )
 
 var (
@@ -36,10 +31,10 @@ const driverName = "amazoncf"
 type Driver struct {
 	*drivers.BaseDriver
 	CloudFormationURL string
-	SSHKeyPath string
-	InstanceId string
-	PrivateIPAddress string
-	KeyPairName string
+	SSHKeyPath        string
+	InstanceId        string
+	PrivateIPAddress  string
+	KeyPairName       string
 }
 
 func NewDriver(hostName, storePath string) *Driver {
@@ -59,11 +54,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage: "S3 URL of the CloudFormation File",
 		},
 		mcnflag.StringFlag{
-			Name: "cloudformation-keypairname",
+			Name:  "cloudformation-keypairname",
 			Usage: "SSH KeyPair to use",
 		},
 		mcnflag.StringFlag{
-			Name: "cloudformation-keypath",
+			Name:  "cloudformation-keypath",
 			Usage: "keypath to SSH Private Key",
 		},
 	}
@@ -90,7 +85,7 @@ func (d *Driver) Create() error {
 	svc := cloudformation.New(session.New())
 
 	params := &cloudformation.CreateStackInput{
-		StackName:   aws.String(d.MachineName),
+		StackName: aws.String(d.MachineName),
 		//TemplateURL: aws.String("https://s3.amazonaws.com/com.tamr.fe.users/jellin/docker.json"),
 		TemplateURL: aws.String(d.CloudFormationURL),
 		Parameters: []*cloudformation.Parameter{
@@ -120,7 +115,6 @@ func (d *Driver) Create() error {
 
 	}
 
-
 	d.getInstanceInfo()
 
 	log.Debugf("created instance ID %s, IP address %s, Private IP address %s",
@@ -129,8 +123,7 @@ func (d *Driver) Create() error {
 		d.PrivateIPAddress,
 	)
 
-
-return nil
+	return nil
 }
 
 func stackAvailable() bool {
@@ -159,27 +152,27 @@ func stackAvailable() bool {
 
 func (d *Driver) getInstanceInfo() error {
 
-	 svc := cloudformation.New(session.New())
+	svc := cloudformation.New(session.New())
 
-	 params := &cloudformation.DescribeStacksInput{
-        StackName: aws.String(d.MachineName),
-     }
-     resp, _ := svc.DescribeStacks(params)
+	params := &cloudformation.DescribeStacksInput{
+		StackName: aws.String(d.MachineName),
+	}
+	resp, _ := svc.DescribeStacks(params)
 
-       for _,element := range resp.Stacks[0].Outputs {
-            outputV := *element.OutputValue
-            if(*element.OutputKey=="PrivateIp"){
-              d.PrivateIPAddress = outputV
-            }
-            if(*element.OutputKey=="InstanceID"){
-               d.InstanceId = outputV
-            }
-             if(*element.OutputKey=="IpAddress"){
-               d.IPAddress = outputV
-            }
+	for _, element := range resp.Stacks[0].Outputs {
+		outputV := *element.OutputValue
+		if *element.OutputKey == "PrivateIp" {
+			d.PrivateIPAddress = outputV
+		}
+		if *element.OutputKey == "InstanceID" {
+			d.InstanceId = outputV
+		}
+		if *element.OutputKey == "IpAddress" {
+			d.IPAddress = outputV
+		}
 
- }   
-	
+	}
+
 	//get InstanceId, IpAddress, PrivateIpAddress
 
 	return nil
@@ -204,32 +197,31 @@ func (d *Driver) GetIP() (string, error) {
 	return *d.getInstance().PrivateIpAddress, nil
 }
 
+func (d *Driver) getInstance() ec2.Instance {
+	svc := ec2.New(session.New())
 
-func (d *Driver) getInstance() (ec2.Instance){
-	  svc := ec2.New(session.New())
+	params := &ec2.DescribeInstancesInput{
+		//   DryRun: aws.Bool(true),i-65e27fce  9f2dea3d
 
-    params := &ec2.DescribeInstancesInput{
-     //   DryRun: aws.Bool(true),i-65e27fce  9f2dea3d
-        
-        InstanceIds: []*string{
-           aws.String(d.InstanceId), // Required
-            // More values...
-        },
-       // MaxResults: aws.Int64(1),
-       // NextToken:  aws.String("String"),
-        }
-    
-    resp, err := svc.DescribeInstances(params)
+		InstanceIds: []*string{
+			aws.String(d.InstanceId), // Required
+			// More values...
+		},
+		// MaxResults: aws.Int64(1),
+		// NextToken:  aws.String("String"),
+	}
 
-    if err != nil {
-        // Print the error, cast err to awserr.Error to get the Code and
-        // Message from an error.
-        fmt.Println(err.Error())
-      
-    }
+	resp, err := svc.DescribeInstances(params)
 
-    //this should return error
-   return *resp.Reservations[0].Instances[0]
+	if err != nil {
+		// Print the error, cast err to awserr.Error to get the Code and
+		// Message from an error.
+		fmt.Println(err.Error())
+
+	}
+
+	//this should return error
+	return *resp.Reservations[0].Instances[0]
 
 }
 
@@ -252,7 +244,7 @@ func (d *Driver) GetState() (state.State, error) {
 	//default:
 	//	return state.Error, nil
 	//}
-	return state.Running,nil
+	return state.Running, nil
 }
 
 // GetSSHHostname -
@@ -298,13 +290,11 @@ func (d *Driver) Start() error {
 	return nil
 }
 
-func (d *Driver) waitForInstance() error{
+func (d *Driver) waitForInstance() error {
 
 	//need to wait on instance to start
 	return nil
 }
-
-
 
 func (d *Driver) Restart() error {
 
@@ -363,7 +353,6 @@ func (d *Driver) Kill() error {
 
 	return nil
 }
-
 
 func (d *Driver) Stop() error {
 
@@ -427,8 +416,3 @@ func generateId() string {
 	io.WriteString(h, string(rb))
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
-
-
-
-
-
